@@ -1,0 +1,62 @@
+#define BLYNK_PRINT Serial
+#define BLYNK_TEMPLATE_ID "blynk_template_id"
+#define BLYNK_TEMPLATE_NAME "smart peg"
+
+#include <WiFi.h>
+#include <WiFiClient.h>
+#include <BlynkSimpleEsp32.h>
+
+const char* ssid = "wifi_name";
+const char* password = "password";
+char auth[] ="char_auth";
+
+WiFiServer server(8080);
+
+bool notificationSent = false;
+
+void setup() {
+    Serial.begin(115200);
+    WiFi.begin(ssid, password);
+    
+    Serial.print("Connecting to WiFi");
+    while (WiFi.status() != WL_CONNECTED) {
+        Serial.print(".");
+        delay(1000);
+    }
+    
+    Serial.println("\nConnected to WiFi!");
+    server.begin();
+   
+    Blynk.begin(auth, ssid, password, "blynk.cloud", 80);
+}
+
+void loop() {
+    Blynk.run();  
+
+    WiFiClient client = server.available();
+        String receivedData = client.readString(); 
+
+        if (receivedData.length() > 0) {
+            int moistureValue = receivedData.toInt();    
+
+            moistureValue = map(moistureValue, 0, 4095, 0, 100);  
+
+            Serial.print("Received Moisture: ");
+            Serial.println(moistureValue);
+            
+            Blynk.virtualWrite(V0, moistureValue);
+            if (moistureValue > 70 && !notificationSent) {  
+                Serial.println("Sending Notification: Moisture too high!");
+                Blynk.logEvent("dry");
+                notificationSent = true;
+            } 
+            else if (moistureValue <= 70) {  
+                notificationSent = false; 
+            }
+        } else {
+            Serial.println("No valid data received!");
+        }
+
+        client.stop(); 
+    }
+}
